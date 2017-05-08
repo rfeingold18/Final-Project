@@ -1,0 +1,511 @@
+---
+title: "Final Project"
+author: "Rachel Feingold"
+date: "5/1/2017"
+output: pdf_document
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Wildfires 
+
+## Packages Used 
+These are the pachages required by my code to run
+```{r, include=FALSE}
+require(foreign)
+require(ff)
+require(dplyr)
+require(lubridate)
+require(ggplot2)
+require(ggmap)
+require(dplyr)
+require(tidyr)
+require(plotly)
+```
+
+## Loading Data 
+
+I decide to start with the first year in the Google Drive, 2007. 
+```{r, include=FALSE}
+wild07 <- read.dbf("~/MA415/Final Project/FPShiny2/2007/wildlands.dbf")
+codes <-  read.dbf("~/MA415/Final Project/FPShiny2/2007/codelookup.dbf")
+```
+
+## Cleaning the 2007 Data
+
+I used two primary functions: table(factor()) and length(x[is.na(x)]) to pick and choose which variables I would keep to observe.
+```{r, include = FALSE}
+# keeping the relevant columns from wild07
+length(wild07$HUM_FACT1[is.na(wild07$HUM_FACT1)])
+
+table(factor(wild07$FIRE_CAUSE))
+# All NA's for human factors 7 and 8, most variation for human factor 1
+table(factor(wild07$HUM_FACT1))
+# table(factor(wild07$HUM_FACT2))
+# table(factor(wild07$HUM_FACT3))
+# table(factor(wild07$HUM_FACT4))
+# table(factor(wild07$HUM_FACT5))
+# table(factor(wild07$HUM_FACT6))
+
+table(factor(wild07$FACT_IGN1))
+table(factor(wild07$FACT_IGN2))
+
+# table(factor(wild07$SUPP_FACT1))
+# table(factor(wild07$SUPP_FACT2))
+# table(factor(wild07$SUPP_FACT3))
+
+length(wild07$BLDG_INV[is.na(wild07$BLDG_INV)])
+mean(wild07$BLDG_INV,na.rm = T) # 0.074
+mean(wild07$BLDG_THR,na.rm = T) # 0.3077
+mean(wild07$ACRES_BURN,na.rm = T) # 466.4983
+
+# table(factor(wild07$CROP_BURN1))
+# table(factor(wild07$CROP_BURN2))
+# table(factor(wild07$CROP_BURN3))
+
+length(wild07$UNDET_BURN[is.na(wild07$UNDET_BURN)])
+mean(wild07$UNDET_BURN,na.rm = T) # 32.96
+mean(wild07$TAX_BURN,na.rm = T) # 10.12
+
+table(factor(wild07$PROP_MANAG))
+
+mean(wild07$ELEVATION, na.rm = T) # 157.87 
+mean(wild07$FLAME_LGTH, na.rm = T) # 0.439
+mean(wild07$SPREAD_RAT, na.rm = T) # 0.562
+
+wild07 <-  select(wild07,STATE, FDID, INC_DATE, INC_NO, LATITUDE, LONGITUDE, AREA_TYPE, FIRE_CAUSE, HUM_FACT1, FACT_IGN1, FACT_IGN2,
+                   ACRES_BURN, UNDET_BURN, PERSON_FIR, GENDER, AGE, ACTIVITY_W, ELEVATION, FLAME_LGTH, SPREAD_RAT)
+```
+Then, I transformed the character variables that had coding for different factors using the codes.dbf file.
+```{r, include=FALSE}
+
+# Want AREA-TYPE to have a real, written desciption, instead of number for each type of area.
+a_types <- codes[(codes$FIELDID == "AREA_TYPE"),]
+a_types <- rename(a_types, AREA_TYPE = CODE_VALUE)
+wild07 <- left_join(wild07, a_types, by = "AREA_TYPE")
+wild07 <- select(wild07, -AREA_TYPE, -FIELDID)
+wild07 <- rename(wild07, AREA_TYPE = CODE_DESCR)  
+rm(a_types)
+
+# Do the same for Fire Cause
+fc <- codes[(codes$FIELDID == "FIRE_CAUSE"),]
+fc <- rename(fc, FIRE_CAUSE = CODE_VALUE)
+wild07 <- left_join(wild07, fc, by = "FIRE_CAUSE")
+wild07 <- select(wild07, -FIRE_CAUSE, -FIELDID)
+wild07 <- rename(wild07, FIRE_CAUSE = CODE_DESCR)  
+rm(fc)
+
+# Do the same for Human Factors 1 Contributing to Ignition
+hf1 <- codes[(codes$FIELDID == "HUM_FAC_1"),]
+hf1 <- rename(hf1, HUM_FACT1 = CODE_VALUE)
+wild07 <- left_join(wild07, hf1, by = "HUM_FACT1")
+wild07 <- select(wild07, -HUM_FACT1, -FIELDID)
+wild07 <- rename(wild07, HUM_FACT1 = CODE_DESCR)  
+rm(hf1)
+
+# Do the same for factors Contributing to Ignition (1 and 2)
+
+if1 <- codes[(codes$FIELDID == "FACT_IGN_1"),]
+if1 <- rename(if1, FACT_IGN1 = CODE_VALUE)
+wild07 <- left_join(wild07, if1, by = "FACT_IGN1")
+wild07 <- select(wild07, -FACT_IGN1, -FIELDID)
+wild07 <- rename(wild07, FACT_IGN1 = CODE_DESCR)  
+rm(if1)
+
+if2 <- codes[(codes$FIELDID == "FACT_IGN_2"),]
+if2 <- rename(if2, FACT_IGN2 = CODE_VALUE)
+wild07 <- left_join(wild07, if2, by = "FACT_IGN2")
+wild07 <- select(wild07, -FACT_IGN2, -FIELDID)
+wild07 <- rename(wild07, FACT_IGN2 = CODE_DESCR)  
+rm(if2)
+
+# Same procedure for demographic data of people who ignited the fires
+
+ppl <- codes[(codes$FIELDID == "PERSON_FIR"),]
+ppl <- rename(ppl, PERSON_FIR = CODE_VALUE)
+wild07 <- left_join(wild07, ppl, by = "PERSON_FIR")
+wild07 <- select(wild07, -PERSON_FIR, -FIELDID)
+wild07 <- rename(wild07, PRSN_RESPONS = CODE_DESCR)  
+rm(ppl)
+
+gen <- codes[(codes$FIELDID == "GENDER"),]
+gen <- rename(gen, GENDER = CODE_VALUE)
+wild07 <- left_join(wild07, gen, by = "GENDER")
+wild07 <- select(wild07, -GENDER, -FIELDID)
+wild07 <- rename(wild07, GENDER = CODE_DESCR)  
+rm(gen)
+
+# Do for Activity performed by the person involved
+
+act <- codes[(codes$FIELDID == "ACTIVITY_W"),]
+act <- rename(act, ACTIVITY_W = CODE_VALUE)
+wild07 <- left_join(wild07, act, by = "ACTIVITY_W")
+wild07 <- select(wild07, -ACTIVITY_W, -FIELDID)
+wild07 <- rename(wild07, IGN_ACTIVITY = CODE_DESCR)  
+rm(act)
+
+# Wanted to change the format of the Incident Dates and make them more sensible to read. 
+wild07$INC_DATE <- mdy(wild07$INC_DATE)
+```
+Then, I wanted to reorder columns into more sensible train of thought. First, I have variables that describe the incident, like incident number, incident ID, date of inicident, and information about the location of the event. Then, I have variables describing the severity and extent of the incident. After, I have variables concerning the factors contributing to cause of ignition. If a human started the incident, then I ordered variables that described the demographics of the person.
+```{r}
+wild07 <- wild07[,c("INC_NO", "FDID", "INC_DATE", "STATE", "LATITUDE","LONGITUDE", "AREA_TYPE", "ACRES_BURN", "UNDET_BURN", "FLAME_LGTH","SPREAD_RAT", "ELEVATION", "FIRE_CAUSE", "FACT_IGN1", "FACT_IGN2", "HUM_FACT1", "IGN_ACTIVITY", "PRSN_RESPONS", "GENDER", "AGE")]
+
+```
+
+## Similar Procedure to Load and Clean Data from the year 2015
+
+I needed to use read table because the data was in txt files.
+```{r, include=FALSE}
+wild15 <- read.table("~/MA415/Final Project/FPShiny2/2015/wildlands.txt", header = T, sep = "^")
+codes15 <- read.table("~/MA415/Final Project/FPShiny2/2015/codelookup.txt", header = T, sep = "^")
+```
+
+##Cleaning Data for 2015
+
+```{r, include=FALSE}
+#Selecting variables of interest
+wild15 <-  select(wild15,STATE, FDID, INC_DATE, INC_NO, LATITUDE, LONGITUDE, AREA_TYPE, FIRE_CAUSE, HUM_FACT1, FACT_IGN1, FACT_IGN2,
+                   ACRES_BURN, UNDET_BURN, PERSON_FIR, GENDER, AGE, ACTIVITY_W, ELEVATION, FLAME_LGTH, SPREAD_RAT)
+
+# Quick Stats 
+mean(wild15$ACRES_BURN,na.rm = T) # 274.13
+mean(wild15$UNDET_BURN,na.rm = T) # 34.66
+mean(wild15$ELEVATION, na.rm = T) # 292.6005 
+mean(wild15$FLAME_LGTH, na.rm = T) # 0.49
+mean(wild15$SPREAD_RAT, na.rm = T) # 0.678
+
+# Transforming the character variables using the codes.dbf file.
+
+# Want AREA-TYPE to have a real, written desciption, instead of number for each type of area. 
+# But area_type reads as numeric when you read the file in rith read.table(), need to change it to a factor first
+wild15$AREA_TYPE <- as.factor(wild15$AREA_TYPE)
+a_types  <- codes15[(codes15$fieldid == "AREA_TYPE"),]
+a_types <- rename(a_types, AREA_TYPE = code_value)
+wild15 <- left_join(wild15, a_types, by = "AREA_TYPE")
+wild15 <- select(wild15, -AREA_TYPE, -fieldid)
+wild15 <- rename(wild15, AREA_TYPE = code_descr)  
+rm(a_types)
+
+# Do the same for Fire Cause
+wild15$FIRE_CAUSE <- as.factor(wild15$FIRE_CAUSE)
+fc  <- codes15[(codes15$fieldid == "FIRE_CAUSE"),]
+fc <- rename(fc, FIRE_CAUSE = code_value)
+wild15 <- left_join(wild15, fc, by = "FIRE_CAUSE")
+wild15 <- select(wild15, -FIRE_CAUSE, -fieldid)
+wild15 <- rename(wild15, FIRE_CAUSE = code_descr)  
+rm(fc)
+
+# Do the same for Human Factors 1 Contributing to Ignition
+wild15$HUM_FACT1 <- as.factor(wild15$HUM_FACT1)
+hf1  <- codes15[(codes15$fieldid == "HUM_FACT1"),]
+hf1  <- rename(hf1, HUM_FACT1 = code_value)
+wild15 <- left_join(wild15, hf1, by = "HUM_FACT1")
+wild15 <- select(wild15, -HUM_FACT1, -fieldid)
+wild15 <- rename(wild15, HUM_FACT1 = code_descr)  
+rm(hf1)
+
+# Do the same for factors Contributing to Ignition (1 and 2)
+wild15$FACT_IGN1 <- as.factor(wild15$FACT_IGN1)
+ign  <- codes15[(codes15$fieldid == "FACT_IGN_1"),]
+ign  <- rename(ign, FACT_IGN1 = code_value)
+wild15 <- left_join(wild15, ign, by = "FACT_IGN1")
+wild15 <- select(wild15, -FACT_IGN1, -fieldid)
+wild15 <- rename(wild15, FACT_IGN1 = code_descr)  
+rm(ign)
+
+wild15$FACT_IGN2 <- as.factor(wild15$FACT_IGN2)
+ign  <- codes15[(codes15$fieldid == "FACT_IGN_2"),]
+ign  <- rename(ign, FACT_IGN2 = code_value)
+wild15 <- left_join(wild15, ign, by = "FACT_IGN2")
+wild15 <- select(wild15, -FACT_IGN2, -fieldid)
+wild15 <- rename(wild15, FACT_IGN2 = code_descr)  
+rm(ign)
+
+# Same procedure for demographic data of people who ignited the fires
+
+wild15$PERSON_FIR <- as.factor(wild15$PERSON_FIR)
+ppl  <- codes15[(codes15$fieldid == "PERSON_FIR"),]
+ppl  <- rename(ppl, PERSON_FIR = code_value)
+wild15 <- left_join(wild15, ppl, by = "PERSON_FIR")
+wild15 <- select(wild15, -PERSON_FIR, -fieldid)
+wild15 <- rename(wild15, PRSN_RESPONS = code_descr)  
+rm(ppl)
+
+wild15$GENDER <- as.factor(wild15$GENDER)
+ppl  <- codes15[(codes15$fieldid == "GENDER"),]
+ppl  <- rename(ppl, GENDER = code_value)
+wild15 <- left_join(wild15, ppl, by = "GENDER")
+wild15 <- select(wild15, -GENDER, -fieldid)
+wild15 <- rename(wild15, GENDER = code_descr)  
+rm(ppl)
+
+# Do for Activity performed by the person involved
+
+wild15$ACTIVITY_W <- as.factor(wild15$ACTIVITY_W)
+ppl  <- codes15[(codes15$fieldid == "ACTIVITY_W"),]
+ppl  <- rename(ppl, ACTIVITY_W = code_value)
+wild15 <- left_join(wild15, ppl, by = "ACTIVITY_W")
+wild15 <- select(wild15, -ACTIVITY_W, -fieldid)
+wild15 <- rename(wild15, IGN_ACTIVITY = code_descr)  
+rm(ppl)
+
+# Wanted to change the format of the Incident Dates and make them more sensible to read. 
+wild15$INC_DATE <- mdy(wild15$INC_DATE)
+
+# Change the order of the variables with the same thinking in mind. 
+
+wild15 <- wild15[, c("INC_NO", "FDID", "INC_DATE", "STATE", "LATITUDE", "LONGITUDE", "AREA_TYPE", "ACRES_BURN", "UNDET_BURN", "FLAME_LGTH","SPREAD_RAT", "ELEVATION", "FIRE_CAUSE", "FACT_IGN1", "FACT_IGN2", "HUM_FACT1", "IGN_ACTIVITY", "PRSN_RESPONS", "GENDER", "AGE")]
+
+rm(codes)
+rm(codes15)
+```
+##  Analysis of Data
+Finally, I have cleaned all the data. Although I will not be using all the variables for analysis, I saved the ones I found most useful. Elevation, spread rate, and flame length all describe the severity of the fire. With more time, I would look at these levels of severity and see if there was an increase over this 8 year period. Then, I would see if there was any correlation with this and acres burned. 
+
+For this project, the question I am trying to solve is: was there a major change in the frequency of wildfires in the US from 2005 to 2017. Do some states have less fires as a result of changes in national policies. The quantitative variables I am using to measure this change is amount of fires is ACRES_BURN, which calculates the total acres burned for each fire incident. I am going to see how this number changes over time for each incident different states.
+
+## Data Plots
+I wanted to look at total acres burned per state and see how this changes over time. Do some states have more fires in 2007 than in 2015 and why?
+```{r}
+# Plot Distribution of Acres Burned
+# I needed to change to a logarithmic scale for Acres Burned because the range of values is so large (0-8,888,900)
+dat1 <- select(wild07, STATE, ACRES_BURN)
+# I  wanted to ignore fires that were less than 1 acre of land burned.
+dat1 <- filter(dat1, ACRES_BURN > 1)
+dat1 <- mutate(dat1, LOG_ACRES = log10(dat1$ACRES_BURN))
+# Plot distribution
+dist1 <- ggplot(dat1) + geom_density(aes(x = LOG_ACRES)) + ggtitle("ggplot of ACRES BURNED distribution on 2007")
+
+# Compare this to 2015 data
+dat2 <- select(wild15, STATE, ACRES_BURN)
+dat2 <- filter(dat2, ACRES_BURN > 1)
+dat2 <- mutate(dat2, LOG_ACRES = log10(dat2$ACRES_BURN))
+dist2 <- ggplot(dat2) + geom_density(aes(x = LOG_ACRES)) + ggtitle("ggplot of ACRES BURNED distribution in 2015")
+
+# Use Plotly to mouse over the points in the graph
+ggplotly(dist1)
+ggplotly(dist2)
+```
+Looking at these plots, it makes sense that there are a lot more wildfires that cover a smaller acreage. Thankfully, wildfires that burn a larger area of land are less common. Just looking at these graphs, it is difficult to see whether there was a statistically significant change in the amount of acres burned during this time period. I decided to look at bar graphs showing the distribution of the total number of wildfires burned in each state. I was curious if there was a mjaor change. Normally, the climatic conditions as well as the geographic landscape of a state will determine whether there are many fires. I hypothesized that there should not be much change.
+
+```{r}
+# Plot of Distribution of Wildfires Per State- 2007
+ggplotly(ggplot(dat1) + geom_bar(aes(x = STATE)) + ggtitle("Counts of Wildfires in Each State in 2007"))
+
+# Plot of Distribution of Wildfires Per State- 2015
+ggplotly(ggplot(dat2) + geom_bar(aes(x = STATE)) + ggtitle("Counts of Wildfires in Each State in 2015"))
+
+# Try plotting the total amount of acres burned per state.
+# First need to clean dat1 and dat2 so that we have a cumulative sum of the total acreage of land burned in each state
+
+# 2007
+tot_acres1 <- within(dat1, {TOT_ACRE <- ave(dat1$ACRES_BURN, dat1$STATE, FUN = cumsum)})
+tot_acres1 <- select(tot_acres1, STATE, TOT_ACRE)
+tot_acres1 <- tot_acres1 %>% group_by(STATE)  %>% slice(which.max(TOT_ACRE)) 
+
+# 2015
+tot_acres2 <- within(dat2, {TOT_ACRE <- ave(dat2$ACRES_BURN, dat2$STATE, FUN = cumsum)})
+tot_acres2 <- select(tot_acres2, STATE, TOT_ACRE)
+tot_acres2 <- tot_acres2 %>% group_by(STATE)  %>% slice(which.max(TOT_ACRE)) 
+
+# Plot of Distribution of TOT_ACRES of Wildfires Per State
+require(scales)
+
+# 2007
+ggplot(subset(tot_acres1, !is.na(TOT_ACRE)), aes(x= STATE, y = TOT_ACRE)) + geom_col() +  scale_y_continuous(labels = comma) + ggtitle("Total Acreage of Wildfires by State in 2007")
+
+# 2015
+ggplot(subset(tot_acres2, !is.na(TOT_ACRE)), aes(x= STATE, y = TOT_ACRE)) + geom_col() +  scale_y_continuous(labels = comma) + ggtitle("Total Acreage of Wildfires by State in 2015")
+
+```
+## Data Tables
+These graphs are difficult to read, let's look at a table of the total acres burned for each state.
+```{r}
+ta07 <- arrange(tot_acres1, desc(TOT_ACRE))
+ta15 <- arrange(tot_acres2, desc(TOT_ACRE))
+
+# Use table to get counts of wildfire incidents per state in 2007 and 2015
+states07 <- table(wild07$STATE)
+states07<- sort(states07,decreasing = T)
+
+states15 <- table(wild15$STATE)
+states15<- sort(states15,decreasing = T)
+
+rm(ta07)
+rm(ta15)
+rm(states07)
+rm(states15)
+```
+| State 	| Total Wildlands Acreage Burned in 2007 	|
+|-------	|----------------------------------------	|
+| FL    	| 10311883.1                             	|
+| MO    	| 8905000.5                              	|
+| CA    	| 2594418.2                              	|
+| MD    	| 2113027.5                              	|
+| WA    	| 1300468.2                              	|
+| NV    	| 995931.2                               	|
+| TX    	| 659759.2                               	|
+| ID    	| 495536.0                               	|
+| MT    	| 136638.7                               	|
+| HI    	| 72208.1                                	|
+
+| State  	| Total Wildlands Acreage Burned in 2015 	|
+|--------	|----------------------------------------	|
+| OH     	| 10000680                               	|
+| WA     	| 1291781                                	|
+| CA     	| 822280                                 	|
+| ID     	| 711350                                 	|
+| NV     	| 359926                                 	|
+| OR     	| 341561                                 	|
+| AZ     	| 209769                                 	|
+| TX     	| 123791                                 	|
+| OK     	| 84736                                  	|
+| SD     	| 78592                                  	|
+
+
+| State                            	| CA    	| TX   	| GA   	| FL   	| WA   	| KS   	|
+|----------------------------------	|-------	|------	|------	|------	|------	|------	|
+| Total Wildfire Incidents in 2007 	| 11831 	| 5192 	| 4026 	| 3772 	| 3449 	| 2437 	|
+
+
+| State                            	| CA   	| TX   	| FL   	| WA   	| KS   	| GA   	|
+|----------------------------------	|------	|------	|------	|------	|------	|------	|
+| Total Wildfire Incidents in 2015 	| 9030 	| 6216 	| 3458 	| 2941 	| 2878 	| 2070 	|
+
+
+There is a disparity between total Wildfires per state and total acres burned! One explanation is that I removed all the fires with an acerage < 1 from the data. We should use a statistical approach or method to see if there is really a difference in the amount of wildfires in different states from 2007 to 2015. 
+
+## Hypothesis Test 
+I ran a two sample t-test, testing if there is a statisticaly significant difference in mean amount of total acres burned in 2007 and 2015. The null hypthesis is that the there is no difference in mean amount of acres burned. The p value of the test was 0.39. At a significance level, alpha= 0.05, we fail to reject the null. We do not have enough evidence to say that there is a difference in mean amount of total acres burned in 2007 and 2015.
+```{r}
+t.test(tot_acres1$TOT_ACRE, tot_acres2$TOT_ACRE, mu = 0, var.equal = T)
+```
+
+##Playing with Maps 
+I'd like to map different causes of fires over the map of the US, to see if one part of the country has more fires than another.
+```{r}
+map1 <- get_map(location = "united states", zoom = 4, maptype = "terrain", source = "google", color = "color")
+# This is just a map of the US
+#ggmap(map1)
+
+# Mapping the wildfire incidents, showing the different causes related to the fire, by colored points.
+data <- select(wild07, LATITUDE, LONGITUDE, FIRE_CAUSE)
+# If there were NA values for these character variables, the codes set their value as the name of the variable in all caps; we want to filter these out. 
+data <- filter(data, FIRE_CAUSE != "WILDLAND FIRE CAUSE")
+# add points
+m1 <- ggmap(map1) + geom_point(aes(x = LONGITUDE, y = LATITUDE, color = FIRE_CAUSE), data = data, alpha = .5, na.rm = T) + ggtitle("Map of Wildfire Incidents in 2007 by Cause of Fire")
+m1
+
+# Mapping the wildfire incidents, showing the different human factors related to fire ignition, by colored points.
+data1 <- select(wild07, LATITUDE, LONGITUDE, HUM_FACT1)
+data1 <- filter(data1, HUM_FACT1 != "HUMAN FACTORS CONTRIBUTING TO IGNITION 1")
+data1 <- filter(data1, HUM_FACT1 != "None")
+m2 <- ggmap(map1) + geom_point(aes(x = LONGITUDE, y = LATITUDE, color = HUM_FACT1), data = data1, alpha = .5, na.rm = T) + ggtitle("Map of Wildfire Incidents in 2007 by Human Cause of Ignition")
+m2
+```
+Maps that best exemplifies my original research question: 
+```{r}
+# Mapping the total amount of Acres Burned by State for 2007
+# Need to transform state abbreviations to full names first
+#'x' is the column of a data.frame that holds 2 digit state codes
+stateFromLower <-function(x) {
+   #read 52 state codes into local variable [includes DC (Washington D.C. and PR (Puerto Rico)]
+  st.codes<-data.frame(
+                      state=as.factor(c("AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL", "GA",
+                                         "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA", "MA", "MD", "ME",
+                                         "MI", "MN", "MO", "MS",  "MT", "NC", "ND", "NE", "NH", "NJ", "NM",
+                                         "NV", "NY", "OH", "OK", "OR", "PA", "PR", "RI", "SC", "SD", "TN",
+                                         "TX", "UT", "VA", "VT", "WA", "WI", "WV", "WY")),
+                      full=as.factor(c("alaska","alabama","arkansas","arizona","california","colorado",
+                                       "connecticut","district of columbia","delaware","florida","georgia",
+                                       "hawaii","iowa","idaho","illinois","indiana","kansas","kentucky",
+                                       "louisiana","massachusetts","maryland","maine","michigan","minnesota",
+                                       "missouri","mississippi","montana","north carolina","north dakota",
+                                       "nebraska","new hampshire","new jersey","new mexico","nevada",
+                                       "new york","ohio","oklahoma","oregon","pennsylvania","puerto rico",
+                                       "rhode island","south carolina","south dakota","tennessee","texas",
+                                       "utah","virginia","vermont","washington","wisconsin",
+                                       "west virginia","wyoming"))
+                       )
+     #create an nx1 data.frame of state codes from source column
+  st.x<-data.frame(state=x)
+     #match source codes with codes from 'st.codes' local variable and use to return the full state name
+  refac.x<-st.codes$full[match(st.x$state,st.codes$state)]
+     #return the full state names in the same order in which they appeared in the original source
+  return(refac.x)
+}
+TA1 <- select(tot_acres1, everything())
+TA1$STATE <- stateFromLower(TA1$STATE)
+
+#libraries needed
+require(zipcode)
+require("choroplethrMaps")
+require("choroplethr")
+# Base Map
+states_map <- map_data("state")
+head(states_map)
+# Maps the total acres burned, as density
+ggplot(TA1, aes(map_id = TA1$STATE)) +
+ geom_map(aes(fill = TA1$TOT_ACRE), map = states_map, color ="black") +
+ expand_limits(x = states_map$long, y = states_map$lat) +
+ theme(legend.position = "bottom",
+ axis.ticks = element_blank(),
+ axis.title = element_blank(),
+ axis.text = element_blank()) +
+ scale_fill_gradient(low="white", high="blue") +
+ guides(fill = guide_colorbar(barwidth = 10, barheight = .5)) 
+ 
+# 2017
+TA2 <- select(tot_acres2, everything())
+TA2$STATE <- stateFromLower(TA2$STATE)
+TA2$STATE <- stateFromLower(tot_acres2$STATE)
+
+# Maps the total acres burned, as density
+ggplot(TA2, aes(map_id = TA2$STATE)) +
+ geom_map(aes(fill = TA2$TOT_ACRE), map = states_map, color ="black") +
+ expand_limits(x = states_map$long, y = states_map$lat) +
+ theme(legend.position = "bottom",
+ axis.ticks = element_blank(),
+ axis.title = element_blank(),
+ axis.text = element_blank()) +
+ scale_fill_gradient(low="white", high="blue") +
+ guides(fill = guide_colorbar(barwidth = 10, barheight = .5)) 
+ 
+```
+
+## Saving Data to use in Shiny Apps
+```{r, include=FALSE}
+save(wild07, file = "wild07.Rdata")
+save(wild15, file = "wild15.Rdata")
+save(tot_acres1, file = "tot_acre07.Rdata")
+save(tot_acres2, file = "tot_acre15.Rdata")
+rm(list = ls())
+```
+
+## Link to Shiny App
+Unfortunately, I was unable to publish my shiny app onto shinyapps.io. There was an error message with the package "tigris" which i didn't even use. It took very long to run and I could not trouble shoot this error. 
+The error looked like: 
+
+* installing *source* package ‘tigris’ ...
+** package ‘tigris’ successfully unpacked and MD5 sums checked
+** R
+** data
+*** moving datasets to lazyload DB
+** preparing package for lazy loading
+Error in dyn.load(file, DLLpath = DLLpath, ...) : 
+  unable to load shared object '/usr/local/lib/R/site-library/rgdal/libs/rgdal.so':
+  libgdal.so.1: cannot open shared object file: No such file or directory
+ERROR: lazy loading failed for package ‘tigris’
+* removing ‘/usr/local/lib/R/site-library/tigris’
+################################# End Task Log ################################# 
+Error: Unhandled Exception: Child Task 386668264 failed: Error building image: Error building tigris (0.5). Build exited with non-zero status: 1
+Execution halted
+
+
+Here is the link to my shinyapp.io account anyways. I will also upload my app to github.
+
+https://rfeingold.shinyapps.io/fpshiny2/
