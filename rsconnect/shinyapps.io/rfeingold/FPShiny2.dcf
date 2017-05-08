@@ -1,0 +1,11 @@
+name: fpshiny2
+title: FPShiny2
+account: rfeingold
+server: shinyapps.io
+appId: 178686
+bundleId: 819480
+url: https://rfeingold.shinyapps.io/fpshiny2/
+when: 1494265204.42114
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: Feingold FProject.Rmd|2007/arson.dbf|2007/arsonagencyreferal.dbf|2007/arsonjuvsub.dbf|2007/basicaid.dbf|2007/basicincident.dbf|2007/civiliancasualty.dbf|2007/codelookup.DBF|2007/ems.dbf|2007/fdheader.dbf|2007/ffcasualty.dbf|2007/ffequipfail.dbf|2007/fireincident.dbf|2007/hazchem.dbf|2007/hazmat.dbf|2007/hazmatequipinvolved.dbf|2007/hazmobprop.dbf|2007/incidentaddress.dbf|2007/legacyfields.dbf|2007/wildlands.dbf|2015/arson.txt|2015/arsonagencyreferal.txt|2015/arsonjuvsub.txt|2015/basicaid.txt|2015/basicincident.txt|2015/civiliancasualty.txt|2015/codelookup.txt|2015/ems.txt|2015/fdheader.txt|2015/ffcasualty.txt|2015/ffequipfail.txt|2015/fireincident.txt|2015/hazchem.txt|2015/hazmat.txt|2015/hazmatequipinvolved.txt|2015/hazmobprop.txt|2015/incidentaddress.txt|2015/wildlands.txt|www/Fires.jpg
